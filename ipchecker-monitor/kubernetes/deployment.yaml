@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ipchecker-monitor
+  namespace: qpc40392445
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ipchecker-monitor
+  template:
+    metadata:
+      labels:
+        app: ipchecker-monitor
+    spec:
+      containers:
+      - name: ipchecker-monitor
+        image: repository.hal.davecutting.uk:5005/mattchris/ipchecker-monitor:latest
+        ports:
+        - containerPort: 4000
+        env:
+        - name: DOTNET_USE_POLLING_FILE_WATCHER
+          value: "true"
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        imagePullPolicy: Always
+      imagePullSecrets:
+      - name: registry-credentials

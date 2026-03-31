@@ -1,0 +1,32 @@
+{
+  "name": "ipchecker-revproxy",
+  "version": "1.0.0",
+  "description": "Reverse proxy for IPChecker microservices",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest --coverage",
+    "start": "node src/app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@repository.hal.davecutting.uk/mattchris/ipchecker-revproxy.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.13.2",
+    "cors": "^2.8.5",
+    "fs": "^0.0.1-security",
+    "express": "^4.18.2"
+  },
+    "devDependencies": {
+    "jest": "^29.5.0",
+    "supertest": "^6.3.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": ["/node_modules/"]
+  }
+}

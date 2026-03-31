@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ipchecker-validip
+  namespace: qpc40392445
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ipchecker-validip
+  template:
+    metadata:
+      labels:
+        app: ipchecker-validip
+    spec:
+      containers:
+      - name: ipchecker-validip
+        image: repository.hal.davecutting.uk:5005/mattchris/ipchecker-validip:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DOTNET_USE_POLLING_FILE_WATCHER
+          value: "true"
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        imagePullPolicy: Always
+      imagePullSecrets:
+      - name: registry-credentials

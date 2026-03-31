@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>IPAddressChecker</title>
+
+<script type="text/javascript">
+
+let config = {};
+
+fetch('config.json')
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Failed to load configuration');
+    }
+    return response.json();
+  })
+  .then(data => {
+    config = data.services;
+    console.log('Configuration loaded successfully');
+  })
+  .catch(error => {
+    console.error('Error loading configuration:', error);
+    alert('Failed to load service configuration. Please refresh the page.');
+  });
+
+function displayTotalIP(total_ips)
+{
+    document.getElementById('output-text').value = 'Total IP addresses = ' + total_ips;
+}
+
+function displayTotalEmpty(total_empty_ips)
+{
+    document.getElementById('output-text').value = 'Total empty IP addresses = ' + total_empty_ips;
+}
+
+function clearText()
+{
+    document.getElementById('input-text').value = '';
+    document.getElementById('output-text').value = '';
+}
+
+function displayValidIPs(results, total_valid_ips)
+{
+    let output = 'Total valid IP addresses = ' + total_valid_ips + '\n\n';
+    output += 'Results:\n';
+    results.forEach(result => {
+        output += result + '\n';
+    });
+    document.getElementById('output-text').value = output;
+}
+
+function displayClassifiedIPs(results, ipv4, ipv6)
+{
+    let output = 'IPv4: ' + ipv4 + '\nIPv6: ' + ipv6 + '\n\n';
+    output += 'Results:\n';
+    results.forEach(result => {
+        output += result + '\n';
+    });
+    document.getElementById('output-text').value = output;
+}
+
+function displayCountries(countries)
+{
+    let result = 'Country Information:\n';
+    for (let ip in countries) {
+        result += ip + ' => ' + countries[ip] + '\n';
+    }
+    document.getElementById('output-text').value = result;
+}
+
+function displayBadIPs(results, good_ips, bad_ips)
+{
+    let output = 'Good IPs: ' + good_ips + '\nBad IPs: ' + bad_ips + '\n\n';
+    output += 'Results:\n';
+    results.forEach(result => {
+        output += result + '\n';
+    });
+    document.getElementById('output-text').value = output;
+}
+
+function displaySavedID(id)
+{
+    document.getElementById('saved-id').value = id;
+    document.getElementById('output-text').value = 'IP addresses saved successfully!\nYour ID: ' + id;
+}
+
+function displayLoadedIPs(items, timestamp)
+{
+    document.getElementById('input-text').value = items;
+    document.getElementById('output-text').value = 'IP addresses loaded successfully!\nSaved on: ' + timestamp;
+}
+
+function multiURLs(serviceName, servicePath, items, output, method = 'GET', bodyData = null)
+{
+  const urls = config[serviceName];
+  let urlIndex = 0;
+
+  function tryURL() {
+    if(urlIndex >= urls.length){
+      document.getElementById('output-text').value = 'All url endpoints failed';
+      return;
+    }
+
+    const url = urls[urlIndex] + servicePath;
+    
+    if (method === 'POST' && bodyData) {
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyData)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          document.getElementById('output-text').value = 'Response results an error';
+        } else {
+          output(data);
+        }
+      })
+      .catch(error => {
+        console.log(`${urls[urlIndex]} failed, trying next`);
+        urlIndex++;
+        tryURL();
+      });
+    } else {
+    let xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4) {
+          if(this.status == 200) {
+            try{
+              var j = JSON.parse(this.response);
+              if(j.error){
+                document.getElementById('output-text').value = 'Response results an error';
+              }
+              else {
+                output(j);
+              }
+            } catch(error){
+                document.getElementById('output-test').value = 'Error: ' + error.message;
+            }
+          }
+          else {
+            document.getElementById('output-text').value = 'Service is unavailable (error status:' + this.status + ')';
+            urlIndex++;
+            tryURL();
+          }
+        }
+      };
+      xhttp.open("GET", url + "?items=" + items);
+      xhttp.send();
+    }
+  }
+
+  tryURL();
+}
+
+function getTotalIPs()
+{
+  let items = document.getElementById('input-text').value;
+
+  if (!items) {
+    document.getElementById('output-text').value = 'Please enter IP addresses';
+    return;
+  }
+
+  let servicePath = '/totalIPs';
+  
+  multiURLs(
+    'revProxy', servicePath, items,
+    function(data) {
+      displayTotalIP(data.total_ips);
+    }
+  );
+}
+
+function getTotalEmptyIPs()
+{
+  let items = document.getElementById('input-text').value;
+
+  if (!items) {
+    document.getElementById('output-text').value = 'Please enter IP addresses';
+    return;
+  }
+
+  let servicePath = '/totalEmptyIPs';
+  
+  multiURLs(
+    'revProxy', servicePath, items,
+    function(data) {
+      displayTotalEmpty(data.total_empty_ips);
+    }
+  );
+}
+
+function getTotalValidIPs()
+{
+  let items = document.getElementById('input-text').value;
+
+  if (!items) {
+    document.getElementById('output-text').value = 'Please enter IP addresses';
+    return;
+  }
+
+  let servicePath = '/validip';
+  
+  multiURLs(
+    'revProxy', servicePath, items,
+    function(data) {
+      displayValidIPs(data.results, data.total_valid_ips);
+    }
+  );
+}
+
+function classifyIPs()
+{
+  let items = document.getElementById('input-text').value;
+  
+  if (!items) {
+    document.getElementById('output-text').value = 'Please enter IP addresses';
+    return;
+  }
+
+  let servicePath = '/classifyip';
+  
+  multiURLs(
+    'revProxy', servicePath, items,
+    function(data) {
+      displayClassifiedIPs(data.results, data.ipv4, data.ipv6);
+    }
+  );
+}
+
+function findCountry()
+{
+  let items = document.getElementById('input-text').value;
+  
+  if (!items) {
+    document.getElementById('output-text').value = 'Please enter IP addresses';
+    return;
+  }
+
+  let servicePath = '/infoip';
+
+  multiURLs(
+    'revProxy', servicePath, items,
+    function(data) {
+      displayCountries(data.countries);
+    }
+  );
+}
+
+function findBadIPs()
+{
+  let items = document.getElementById('input-text').value;
+
+  if (!items) {
+    document.getElementById('output-text').value = 'Please enter IP addresses';
+    return;
+  }
+
+  let servicePath = '/badip';
+
+  multiURLs(
+    'revProxy', servicePath, items,
+    function(data) {
+      displayBadIPs(data.results, data.good_ips, data.bad_ips); 
+    }
+  );
+}
+
+function saveIPs()
+{
+  let items = document.getElementById('input-text').value;
+
+  if (!items) {
+    document.getElementById('output-text').value = 'Please enter IP addresses to save';
+    return;
+  }
+
+  let servicePath = '/stateful/save';
+  
+  multiURLs(
+    'revProxy', servicePath, '', 
+    function(data) {
+      displaySavedID(data.id);
+    },
+    'POST',
+    { items: items }
+  );
+}
+
+function loadIPs()
+{
+  let id = document.getElementById('load-id').value;
+
+  if (!id) {
+    document.getElementById('output-text').value = 'Please enter an ID to load';
+    return;
+  }
+
+  let servicePath = '/stateful/load/' + id;
+  
+  multiURLs(
+    'revProxy', servicePath, '',
+    function(data) {
+      displayLoadedIPs(data.items, data.timestamp);
+    }
+  );
+}
+
+</script>
+
+<style type="text/css">
+body  {
+    font-size: 150%;
+    font-family: monospace;
+}
+label {
+    display: inline-block;
+    width: 150px;
+    text-align: left;
+}
+#logo
+{
+    font-family: Calibri, sans-serif;
+    font-weight: lighter;
+    font-size: 30px;
+    color: #505050;
+    margin: 0.5em;
+}
+#normal-text
+{
+    font-family: Calibri, sans-serif;
+    font-size: 20px;
+    margin: 0.5em;
+}
+#ipcheck
+{
+    text-align: center;
+    margin-top: 1em;
+}
+#input-div
+{
+    text-align: center;
+    margin-top: 1em;
+    background-color:#d5d8dc  ;
+}
+#output-div
+{
+    text-align: center;
+    background-color:#808b96 ;
+}
+
+.input-items {
+      font-size: 90%;
+      color: black;
+      background-color:white ;
+      padding: 0.2em;
+      margin: 0.2em;
+      font-family: monospace;
+      letter-spacing: 0.1em;
+      width: 600px;
+
+  }
+
+.display-output {
+    font-size: 90%;
+    color: black;
+    background-color:white ;
+    padding: 0.2em;
+    margin: 0.2em;
+    font-family: monospace;
+    letter-spacing: 0.1em;
+    width: 600px;
+
+}
+
+.button-active {
+    background-color:   #2874a6  ;
+    color: white;
+    padding: 0px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 18px;
+    margin: 4px 2px;
+    cursor: pointer;
+    height: 50px;
+    width: 400px;
+}
+
+.button-inactive {
+    background-color: gray;
+    color: white;
+    padding: 0px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 18px;
+    margin: 4px 2px;
+    cursor: pointer;
+    height: 50px;
+    width: 400px;
+}
+
+.button-clear {
+    background-color:  #c0392b ;
+    color: white;
+    padding: 0px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 18px;
+    margin: 4px 2px;
+    cursor: pointer;
+    height: 40px;
+    width: 400px;
+}
+
+</style>
+
+</head>
+<body>
+<div id="ipcheck">
+    <div id="logo">
+        IP Address Checker
+    </div>
+    <div id="input-div">
+        <p id="normal-text">
+          Paste your IP addresses here (separated by commas)..
+        </p>
+        <textarea class="input-items" id="input-text" rows="5" cols="35" placeholder="Paste your IP addresses here.." value="">
+        </textarea>
+    </div>
+    <div id="output-div">
+       <p id="normal-text">
+          Results
+        </p>
+        <textarea class="display-output" id="output-text" rows="5" cols="35" readonly=1 placeholder="Results here..." value="">
+        </textarea>
+    </div>
+    <div>
+        <button class="button-active" onclick="getTotalIPs();">Total IP addresses</button>
+    </div>
+    <div>
+        <button class="button-active" onclick="getTotalEmptyIPs();">Total empty IP addresses</button>
+    </div>
+    <div>
+        <button class="button-active" onclick="getTotalValidIPs();">Total valid IP addresses</button>
+    </div>
+    <div>
+        <button class="button-active" onclick="classifyIPs();">Classify between IPv4 and IPv6</button>
+    </div>
+    <div>
+        <button class="button-active" onclick="findCountry();">Find country information</button>
+    </div>
+    <div>
+        <button class="button-active" onclick="findBadIPs();">Find bad IP addresses</button>
+    </div>
+    <div id="stateful-section">
+        <p id="normal-text">
+          Save & Load IP Addresses
+        </p>
+        <button class="button-active" onclick="saveIPs();">Save IP Addresses</button>
+    </div>
+    <div id="stateful-section">
+        <textarea class="display-output" id="saved-id" rows="2" cols="35" readonly=1 placeholder="Saved ID will appear here..."></textarea>
+    </div>
+    <div id="stateful-section">
+        <input type="text" class="input-items" id="load-id" placeholder="Enter ID to load..." style="width: 300px; height: 30px;" />
+        <button class="button-active" onclick="loadIPs();" style="width: 280px; height: 40px;">Load IP Addresses</button>
+    </div>
+    <div>
+        <button class="button-clear" onclick="clearText();">Clear</button>
+    </div>
+
+</div>
+</body>
+
+<script type="text/javascript">
+</script>
+
+</html>

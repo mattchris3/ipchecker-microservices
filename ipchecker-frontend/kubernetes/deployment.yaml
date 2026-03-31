@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ipchecker-frontend
+  namespace: qpc40392445
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ipchecker-frontend
+  template:
+    metadata:
+      labels:
+        app: ipchecker-frontend
+    spec:
+      containers:
+      - name: ipchecker-frontend
+        image: repository.hal.davecutting.uk:5005/mattchris/ipchecker-frontend:latest
+        ports:
+        - containerPort: 80
+        imagePullPolicy: Always
+      imagePullSecrets:
+      - name: registry-credentials

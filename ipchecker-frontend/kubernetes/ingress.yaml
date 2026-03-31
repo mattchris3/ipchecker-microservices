@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ipchecker-frontend-ingress
+  namespace: qpc40392445
+spec:
+  rules:
+  - host: ipcheckerfrontend.40392445.qpc.qubcloud.uk
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ipchecker-frontend
+            port:
+              number: 80

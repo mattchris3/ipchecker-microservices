@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ipchecker-badip
+  namespace: qpc40392445
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ipchecker-badip
+  template:
+    metadata:
+      labels:
+        app: ipchecker-badip
+    spec:
+      containers:
+      - name: ipchecker-badip
+        image: repository.hal.davecutting.uk:5005/mattchris/ipchecker-badip:latest
+        ports:
+        - containerPort: 3000
+        imagePullPolicy: Always
+      imagePullSecrets:
+      - name: registry-credentials

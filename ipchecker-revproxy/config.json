@@ -1,0 +1,26 @@
+{
+    "port": 3000,
+    "services": {
+        "totalIPs": [
+            "http://totalips:80/"
+        ],
+        "totalEmptyIPs": [
+            "http://totalemptyips:80/"
+        ],
+        "validip": [
+            "http://validip:80/"
+        ],
+        "classifyip": [
+            "http://classifyip:80/"
+        ],
+        "infoip": [
+            "http://infoip:5001/"
+        ],
+        "badip": [
+            "http://badip:3000/"
+        ],
+        "stateful": [
+            "http://stateful:3000/"
+        ]
+    }
+}

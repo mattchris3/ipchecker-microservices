@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ipchecker-revproxy
+  namespace: qpc40392445
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ipchecker-revproxy
+  template:
+    metadata:
+      labels:
+        app: ipchecker-revproxy
+    spec:
+      containers:
+      - name: ipchecker-revproxy
+        image: repository.hal.davecutting.uk:5005/mattchris/ipchecker-revproxy:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: DOTNET_USE_POLLING_FILE_WATCHER
+          value: "true"
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        imagePullPolicy: Always
+      imagePullSecrets:
+      - name: registry-credentials

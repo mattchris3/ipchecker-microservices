@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ipchecker-infoip
+  namespace: qpc40392445
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ipchecker-infoip
+  template:
+    metadata:
+      labels:
+        app: ipchecker-infoip
+    spec:
+      containers:
+      - name: ipchecker-infoip
+        image: repository.hal.davecutting.uk:5005/mattchris/ipchecker-infoip:latest
+        ports:
+        - containerPort: 5001
+        imagePullPolicy: Always
+      imagePullSecrets:
+      - name: registry-credentials

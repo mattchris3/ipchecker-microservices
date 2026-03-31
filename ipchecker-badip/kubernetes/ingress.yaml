@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ipchecker-badip
+spec:
+  rules:
+  - host: ipchecker-badip.40392445.qpc.qubcloud.uk
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ipchecker-badip
+            port:
+              number: 80

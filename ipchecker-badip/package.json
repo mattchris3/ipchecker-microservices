@@ -1,0 +1,15 @@
+{
+  "name": "ipchecker-badip",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "jest",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

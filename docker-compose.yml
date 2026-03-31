@@ -1,0 +1,73 @@
+version: "3.8"
+
+services:
+  frontend:
+    build: ./ipchecker-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - revproxy
+
+  revproxy:
+    build: ./ipchecker-revproxy
+    ports:
+      - "3000:3000"
+    depends_on:
+      - validip
+      - classifyip
+      - infoip
+      - badip
+      - totalips
+      - totalemptyips
+      - stateful
+
+  validip:
+    build: ./ipchecker-validip
+    environment:
+      - ASPNETCORE_URLS=http://+:80
+    expose:
+      - "80"
+
+  classifyip:
+    build: ./ipchecker-classifyip
+    environment:
+      - ASPNETCORE_URLS=http://+:80
+    expose:
+      - "80"
+
+  infoip:
+    build: ./ipchecker-infoip
+    expose:
+      - "5001"
+
+  badip:
+    build: ./ipchecker-badip
+    expose:
+      - "3000"
+
+  stateful:
+    build: ./ipchecker-stateful
+    expose:
+      - "3000"
+    volumes:
+      - stateful-data:/app/data
+
+  totalips:
+    build: ./ipchecker-totalips
+    expose:
+      - "80"
+
+  totalemptyips:
+    build: ./ipchecker-totalemptyips
+    expose:
+      - "80"
+
+  monitor:
+    build: ./ipchecker-monitor
+    ports:
+      - "4000:4000"
+    depends_on:
+      - revproxy
+
+volumes:
+  stateful-data:
