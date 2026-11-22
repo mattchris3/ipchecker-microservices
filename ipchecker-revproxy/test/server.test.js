@@ -1,123 +1,131 @@
-const request = require('supertest');
+// Tests the real proxy against small fake upstream services on random ports.
 const express = require('express');
+const request = require('supertest');
+const { createApp } = require('../server');
 
-const cors = require('cors');
+const servers = [];
 
-mockApp.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+/** Starts a fake service; resolves with its base URL (ending in "/"). */
+function upstream(setup) {
+    const app = express();
+    app.use(express.json());
+    setup(app);
+    return new Promise((resolve) => {
+        const server = app.listen(0, '127.0.0.1', () => {
+            servers.push(server);
+            resolve(`http://127.0.0.1:${server.address().port}/`);
+        });
+    });
+}
 
-const mockApp = express();
-mockApp.use(express.json());
+// Nothing listens on port 9 (discard), so connections are refused straight away.
+const DEAD = 'http://127.0.0.1:9/';
 
-mockApp.get('/totalIPs', (req, res) => {
-    res.json({ total_ips: 3, items: req.query.items });
-});
+let config;
+let app;
 
-mockApp.get('/totalEmptyIPs', (req, res) => { 
-    res.json({ total_empty_ips: 1, items: req.query.items });
-});
-
-mockApp.get('/validip', (req, res) => {
-    res.json({ total_valid_ips: 2, results: ["192.168.1.1 -> valid (IPv4)", "invalid -> invalid", "10.0.0.1 -> valid (IPv4)"], items: req.query.items });
-});
-
-mockApp.get('/classifyip', (req, res) => {
-    res.json({ ipv4: 2, ipv6: 1, results: ["192.168.1.1 -> IPv4", "10.0.0.1 -> IPv4", "2a00:1450::200e -> IPv6"], items: req.query.items });
-});
-
-mockApp.get('/infoip', (req, res) => {
-    res.json({ countries: { "100.1.1.1": "US" }, items: req.query.items });
-});
-
-mockApp.get('/badip', (req, res) => {
-    res.json({ good_ips: "192.168.1.1", bad_ips: "100.200.300.400", results: ["192.168.1.1 -> Good IP", "100.200.300.400 -> Bad IP"], items: req.query.items });
-});
-
-mockApp.post('/stateful/save', (req, res) => {
-    res.json({ success: true, id: "test-uuid-123", message: "IP addresses saved successfully" });
-});
-
-mockApp.get('/stateful/load/:id', (req, res) => {
-    res.json({ success: true, items: "192.168.1.1,10.0.0.1", timestamp: "2024-11-30T12:00:00.000Z" });
-});
-
-describe('Reverse Proxy API Tests', () => {
-    
-    test('GET /totalIPs returns total IP count', async () => {
-        const response = await request(mockApp)
-            .get('/totalIPs?items=192.168.1.1,10.0.0.1,,172.16.0.1');
-
-        expect(response.status).toBe(200);
-        expect(response.body.total_ips).toBe(3);
+beforeAll(async () => {
+    const counter = await upstream((a) =>
+        a.get('/', (req, res) =>
+            res.json({ error: false, items: req.query.items, total_ips: req.query.items.split(',').length }),
+        ),
+    );
+    const store = await upstream((a) => {
+        const saved = {};
+        a.get('/health', (req, res) => res.json({ status: 'ok' }));
+        a.post('/save', (req, res) => {
+            saved.abc = req.body.items;
+            res.json({ success: true, id: 'abc' });
+        });
+        a.get('/load/:id', (req, res) =>
+            saved[req.params.id]
+                ? res.json({ success: true, items: saved[req.params.id] })
+                : res.status(404).json({ success: false }),
+        );
     });
 
-    test('GET /totalEmptyIPs returns empty IP count', async () => {
-        const response = await request(mockApp)
-            .get('/totalEmptyIPs?items=192.168.1.1,,10.0.0.1');
+    config = {
+        services: {
+            totalIPs: [counter],
+            withFailover: [DEAD, counter],
+            allDown: [DEAD],
+            stateful: [store],
+        },
+    };
+    app = createApp(() => config, { timeout: 1000 });
+});
 
-        expect(response.status).toBe(200);
-        expect(response.body.total_empty_ips).toBe(1);
+afterAll(() => Promise.all(servers.map((s) => new Promise((r) => s.close(r)))));
+
+describe('routing', () => {
+    test('forwards the query to the service and returns its answer', async () => {
+        const res = await request(app).get('/totalIPs').query({ items: '1.1.1.1,8.8.8.8' });
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ error: false, items: '1.1.1.1,8.8.8.8', total_ips: 2 });
     });
 
-    test('GET /validip returns valid IP count', async () => {
-        const response = await request(mockApp)
-            .get('/validip?items=192.168.1.1,invalid,10.0.0.1');
-
-        expect(response.status).toBe(200);
-        expect(response.body.total_valid_ips).toBe(2);
-        expect(response.body.results).toBeDefined();
-        expect(response.body.results.length).toBe(3);
+    test('reports which upstream answered and how long it took', async () => {
+        const res = await request(app).get('/totalIPs').query({ items: '1.1.1.1' });
+        expect(res.headers['x-upstream']).toBe(config.services.totalIPs[0]);
+        expect(Number(res.headers['x-upstream-time'])).toBeGreaterThanOrEqual(0);
     });
 
-    test('GET /classifyip returns IPv4 and IPv6 counts', async () => {
-        const response = await request(mockApp)
-            .get('/classifyip?items=192.168.1.1,10.0.0.1,2a00:1450::200e');
+    test('unknown services are a 404', async () => {
+        const res = await request(app).get('/nope');
+        expect(res.status).toBe(404);
+    });
+});
 
-        expect(response.status).toBe(200);
-        expect(response.body.ipv4).toBe(2);
-        expect(response.body.ipv6).toBe(1);
-        expect(response.body.results).toBeDefined();
-        expect(response.body.results.length).toBe(3);
+describe('failover', () => {
+    test('skips a dead upstream and uses the next one', async () => {
+        const res = await request(app).get('/withFailover').query({ items: '1.1.1.1' });
+        expect(res.status).toBe(200);
+        expect(res.headers['x-upstream']).toBe(config.services.withFailover[1]);
     });
 
-    test('GET /infoip returns country information', async () => {
-        const response = await request(mockApp)
-            .get('/infoip?items=100.1.1.1');
+    test('returns 503 with the failures when every upstream is down', async () => {
+        const res = await request(app).get('/allDown').query({ items: '1.1.1.1' });
+        expect(res.status).toBe(503);
+        expect(res.body.failures).toHaveLength(1);
+        expect(res.body.failures[0].url).toBe(DEAD);
+    });
+});
 
-        expect(response.status).toBe(200);
-        expect(response.body.countries).toBeDefined();
+describe('discovery and health', () => {
+    test('lists the configured services', async () => {
+        const res = await request(app).get('/discover/services');
+        expect(res.body.totalServices).toBe(4);
+        expect(res.body.services.map((s) => s.name)).toContain('withFailover');
     });
 
-    test('GET /badip returns good and bad IPs', async () => {
-        const response = await request(mockApp)
-            .get('/badip?items=192.168.1.1,100.200.300.400');
-
-        expect(response.status).toBe(200);
-        expect(response.body.good_ips).toBeDefined();
-        expect(response.body.bad_ips).toBeDefined();
-        expect(response.body.results).toBeDefined();
-        expect(response.body.results.length).toBe(2);
+    test('checks every endpoint of a service', async () => {
+        const res = await request(app).get('/health/withFailover');
+        expect(res.body.endpoints.map((e) => e.status)).toEqual(['unhealthy', 'healthy']);
     });
 
-    test('POST /stateful/save saves IP addresses', async () => {
-        const response = await request(mockApp)
-            .post('/stateful/save')
-            .send({ items: '192.168.1.1,10.0.0.1' });
-
-        expect(response.status).toBe(200);
-        expect(response.body.success).toBe(true);
-        expect(response.body.id).toBeDefined();
+    test('checks the stateful store on its health endpoint', async () => {
+        const res = await request(app).get('/health/stateful');
+        expect(res.body.endpoints[0].status).toBe('healthy');
     });
 
-    test('GET /stateful/load/:id loads IP addresses', async () => {
-        const response = await request(mockApp)
-            .get('/stateful/load/test-id-123');
+    test('picks up config changes without a restart', async () => {
+        config.services.added = config.services.totalIPs;
+        const res = await request(app).get('/added').query({ items: '1.1.1.1' });
+        expect(res.status).toBe(200);
+        delete config.services.added;
+    });
+});
 
-        expect(response.status).toBe(200);
-        expect(response.body.success).toBe(true);
-        expect(response.body.items).toBeDefined();
+describe('stateful store', () => {
+    test('saves and loads a list', async () => {
+        const saved = await request(app).post('/stateful/save').send({ items: '1.1.1.1,8.8.8.8' });
+        expect(saved.body).toEqual({ success: true, id: 'abc' });
+        const loaded = await request(app).get('/stateful/load/abc');
+        expect(loaded.body.items).toBe('1.1.1.1,8.8.8.8');
+    });
+
+    test('an unknown ID is a 404, not a failed service', async () => {
+        const res = await request(app).get('/stateful/load/missing');
+        expect(res.status).toBe(404);
     });
 });

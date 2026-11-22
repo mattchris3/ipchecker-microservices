@@ -1,7 +1,0 @@
-{
-  "services": {
-    "revProxy": [
-      "http://localhost:3000"
-    ]
-  }
-}

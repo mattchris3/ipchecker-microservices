@@ -9,7 +9,7 @@ $output = array(
 	"total_empty_ips" => 0
 );
 
-$items = $_REQUEST['items'];
+$items = $_REQUEST['items'] ?? '';
 $total_empty_ips=getTotalEmptyIPs($items);
 
 $output['items']=$items;

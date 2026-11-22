@@ -1,0 +1,15 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+**/bin/
+**/obj/
+__pycache__/
+.pytest_cache/
+.venv/
+
+# Local and OS files
+.env
+.env.*
+*.log
+.DS_Store
