@@ -1,12 +1,16 @@
 <?php
+// Counts the entries that are empty or only whitespace ("1.1.1.1, ,8.8.8.8" has 1).
+// An empty input has no entries, so none are empty.
 function getTotalEmptyIPs($items)
 {
-  $ips = explode(",", $items);
-  $total_empty_ips = 0;
-  for ($i = 0; $i < count($ips); $i++) {
-    if ($ips[$i] == ""){
-        $total_empty_ips += 1;
-      }
+  if (trim((string) $items) === '') {
+    return 0;
   }
-  return $total_empty_ips;
+  $empty = 0;
+  foreach (explode(',', $items) as $entry) {
+    if (trim($entry) === '') {
+      $empty++;
+    }
+  }
+  return $empty;
 }

@@ -9,7 +9,7 @@ $output = array(
 	"total_ips" => 0
 );
 
-$items = $_REQUEST['items'];
+$items = $_REQUEST['items'] ?? '';
 $total_ips=getTotalIPs($items);
 
 $output['items']=$items;

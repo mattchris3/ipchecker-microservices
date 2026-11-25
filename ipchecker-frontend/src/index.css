@@ -1,0 +1,45 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, Menlo, monospace;
+
+  --color-bg: #0b0f14;
+  --color-panel: #11161d;
+  --color-panel-2: #161c25;
+  --color-line: #232c38;
+  --color-line-soft: #1a222c;
+  --color-fg: #e6edf3;
+  --color-fg-soft: #b3bfcb;
+  --color-fg-muted: #8592a0;
+  --color-accent: #22d3ee;
+  --color-accent-ink: #062a31;
+  --color-ok: #34d399;
+  --color-bad: #f87171;
+  --color-warn: #fbbf24;
+}
+
+@layer base {
+  html { -webkit-font-smoothing: antialiased; color-scheme: dark; }
+  body { @apply bg-bg text-fg font-sans; }
+  :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  ::selection { background: rgb(34 211 238 / 0.25); }
+}
+
+@layer components {
+  .num { @apply font-mono; font-variant-numeric: tabular-nums; }
+  .panel { @apply rounded-xl border border-line bg-panel; }
+  .label { @apply text-[11px] font-medium uppercase tracking-[0.08em] text-fg-muted; }
+  .btn {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary { @apply bg-accent text-accent-ink hover:bg-cyan-300; }
+  .btn-ghost { @apply border border-line text-fg-soft hover:border-fg-muted hover:text-fg; }
+  .field {
+    @apply w-full rounded-lg border border-line bg-bg px-3 text-sm text-fg placeholder:text-fg-muted focus:border-accent focus:outline-none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

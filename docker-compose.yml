@@ -1,17 +1,22 @@
-version: "3.8"
+# One command runs the whole system:  docker compose up --build
+# Then open http://localhost:8080 (or set PORT=9000 if 8080 is busy).
+#
+# Only the frontend is published. It serves the UI and forwards /api to the
+# reverse proxy and /monitor to the monitor, so everything else stays on the
+# internal Docker network, reachable by service name, as it would be in a cluster.
 
 services:
   frontend:
     build: ./ipchecker-frontend
     ports:
-      - "8080:80"
+      - "${PORT:-8080}:80"
     depends_on:
       - revproxy
+      - monitor
 
   revproxy:
     build: ./ipchecker-revproxy
-    ports:
-      - "3000:3000"
+    expose: ["3000"]
     depends_on:
       - validip
       - classifyip
@@ -21,53 +26,51 @@ services:
       - totalemptyips
       - stateful
 
+  # Validation and classification (C# / ASP.NET Core)
   validip:
     build: ./ipchecker-validip
     environment:
       - ASPNETCORE_URLS=http://+:80
-    expose:
-      - "80"
+    expose: ["80"]
 
   classifyip:
     build: ./ipchecker-classifyip
     environment:
       - ASPNETCORE_URLS=http://+:80
-    expose:
-      - "80"
+    expose: ["80"]
 
+  # Address information (Python / Flask + gunicorn)
   infoip:
     build: ./ipchecker-infoip
-    expose:
-      - "5001"
+    expose: ["5001"]
 
+  # Bogon filter (Node.js / Express)
   badip:
     build: ./ipchecker-badip
-    expose:
-      - "3000"
+    expose: ["3000"]
 
-  stateful:
-    build: ./ipchecker-stateful
-    expose:
-      - "3000"
-    volumes:
-      - stateful-data:/app/data
-
+  # Counting (PHP / Apache)
   totalips:
     build: ./ipchecker-totalips
-    expose:
-      - "80"
+    expose: ["80"]
 
   totalemptyips:
     build: ./ipchecker-totalemptyips
-    expose:
-      - "80"
+    expose: ["80"]
 
+  # Saved lists (Node.js), persisted on a named volume
+  stateful:
+    build: ./ipchecker-stateful
+    expose: ["3000"]
+    volumes:
+      - saved-lists:/app/data
+
+  # Calls every service through the proxy every 5 minutes (Node.js)
   monitor:
     build: ./ipchecker-monitor
-    ports:
-      - "4000:4000"
+    expose: ["4000"]
     depends_on:
       - revproxy
 
 volumes:
-  stateful-data:
+  saved-lists:

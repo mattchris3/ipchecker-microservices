@@ -1,0 +1,128 @@
+# Tests every service in its own language, then builds the whole system with
+# Docker Compose and checks requests flow through the gateway and proxy.
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  node:
+    name: Node.js · ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [ipchecker-badip, ipchecker-revproxy, ipchecker-stateful, ipchecker-monitor]
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  frontend:
+    name: Frontend · React + TypeScript
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ipchecker-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ipchecker-frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  dotnet:
+    name: C# · ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [ipchecker-validip, ipchecker-classifyip]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - run: dotnet test ${{ matrix.service }}/tests
+
+  python:
+    name: Python · ipchecker-infoip
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ipchecker-infoip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q tests
+
+  php:
+    name: PHP · ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [ipchecker-totalips, ipchecker-totalemptyips]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - run: php ${{ matrix.service }}/src/tests/tests.php
+
+  system:
+    name: System · docker compose
+    needs: [node, frontend, dotnet, python, php]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start every container
+        run: docker compose up --build -d --wait --wait-timeout 180
+      - name: Wait until every service answers through the proxy
+        run: |
+          for i in $(seq 1 45); do
+            healthy=0
+            for service in totalIPs totalEmptyIPs validip classifyip infoip badip stateful; do
+              curl -sf "http://localhost:8080/api/health/$service" | jq -e '.endpoints[0].status == "healthy"' >/dev/null && healthy=$((healthy + 1))
+            done
+            echo "$healthy/7 healthy"
+            [ "$healthy" = 7 ] && exit 0
+            sleep 2
+          done
+          exit 1
+      - name: Requests reach every service through the gateway and proxy
+        run: |
+          set -e
+          for service in totalIPs totalEmptyIPs validip classifyip infoip badip; do
+            code=$(curl -s -o /tmp/out -w '%{http_code}' "http://localhost:8080/api/$service?items=8.8.8.8,192.168.1.1,,nope")
+            echo "$service -> $code $(head -c 120 /tmp/out)"
+            test "$code" = 200
+          done
+          id=$(curl -sf -X POST http://localhost:8080/api/stateful/save -H 'content-type: application/json' -d '{"items":"8.8.8.8"}' | jq -r .id)
+          curl -sf "http://localhost:8080/api/stateful/load/$id" | jq -e '.items == "8.8.8.8"'
+          curl -sf http://localhost:8080/api/discover/services | jq -e '.totalServices == 7'
+          curl -sf http://localhost:8080/ | grep -q 'IP Checker'
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --tail 50
+      - run: docker compose down -v
+        if: always()

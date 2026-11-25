@@ -89,6 +89,9 @@ app.get('/health', (req, res) => {
     });
 });
 
+// First check shortly after start (initial run), so results exist straight away.
+setTimeout(monitorTest, 15000).unref();
+
 cron.schedule('*/5 * * * *', () => {
     console.log('Scheduled test triggered (every 5 minutes)');
     monitorTest();
